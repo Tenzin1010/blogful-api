@@ -1,8 +1,10 @@
 //THE tests will be compared with the articles-router file when executed.
 //the test will check to see if the results hold true compared to the article router results
+//SERVER ERROR 500 Check article-router.js for server VALIDATION
 const knex = require('knex')
 const app = require('../src/app')
-const { makeArticlesArray } = require('./api/articles.fixtures')
+const { makeArticlesArray } = require('./articles.fixtures')
+const moment = require('moment')
 
 describe('Articles Endpoints', function() {
   let db
@@ -78,6 +80,30 @@ describe('Articles Endpoints', function() {
           .expect(200, expectedArticle)
       })
     })
+    context(`Given an XSS attack article`, () => {
+      const maliciousArticle = {
+        id: 911,
+        title: 'Naughty naughty very naughty <script>alert("xss");</script>',
+        style: 'How-to',
+        content: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`
+      }
+  
+      beforeEach('insert malicious article', () => {
+        return db
+          .into('blogful_articles')
+          .insert([ maliciousArticle ])
+      })
+  
+      it('removes XSS attack content', () => {
+        return supertest(app)
+          .get(`/articles/${maliciousArticle.id}`)
+          .expect(200)
+          .expect(res => {
+            expect(res.body.title).to.eql('Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;')
+            expect(res.body.content).to.eql(`Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`)
+          })
+      })
+    })
   })
 
 // POST TEST 
@@ -99,7 +125,7 @@ describe('Articles Endpoints', function() {
           expect(res.body.style).to.eql(newArticle.style)
           expect(res.body.content).to.eql(newArticle.content)
           expect(res.body).to.have.property('id')
-          expect(res.headers.location).to.eql(`/api/articles/${res.body.id}`)
+          expect(res.headers.location).to.eql(`/api/articles${res.body.id}`)
           const expected = new Date().toLocaleString('en', { timeZone: 'UTC' })
           const actual = new Date(res.body.date_published).toLocaleString()
           expect(actual).to.eql(expected)
@@ -198,6 +224,103 @@ describe('Articles Endpoints', function() {
               .expect(expectedArticles)
           )
       })
+    })
+  })
+
+  //PATCH TEST
+  describe(`PATCH /api/articles/:article_id`, () => {
+    context(`Given no articles`, () => {
+        //it executes .patch and since articleId doesn't exist, which is checked in articles-router.js
+        //the .all() method is used and that response is 404 anytime ID is not found. 
+        it(`responds with 404`, () => {
+            const articleId = 123456
+            return supertest(app)
+            .patch(`/api/articles/${articleId}`)
+            .expect(400, {error: {message: `Article doesn't exist`}})
+        })
+    })
+    context('Given there are articles in the database', () => {
+        const testArticles = makeArticlesArray()
+//This section inserts the test data in the table
+        beforeEach('insert articles', () => {
+        return db
+            .into('blogful_articles')
+            .insert(testArticles)
+        })
+//Juan whats going on here, this is used in post as well. ???????
+        //We can add code to the articles-router.js to pass this test:
+        //code = is inserted in article-router.js "".patch((req, res) => { res.status(204).end()})
+        it('responds with 204 and updates the article', () => {
+//COMPLETE explanation:  the ID that want to update is id: 2 which will used inthe endpoint api/articles/2
+//and the part we want to update will be title, style & content only(TSC). 
+//so the complete updated article will be = expectedArticle, with id:2, date_published....., & the new values for TSC
+//then we test it by calling supertest(app), method used is .patch, send the new values for TSC
+//204 is request fulfilled by server but no content needs to be returned
+//.then will be used to now test the GET method should be the entire updated article with ID 2 = expectedArticle      
+//the GET will verify if the update passes
+          const idToUpdate = 2
+        const updateArticle = {
+            title: 'updated article title',
+            style: 'Interview',
+            content: 'updated article content',
+        }
+        //the ...spread operator extends the last object after the comma and replaces
+        //the value if it already exists in the previous object
+        //in our case testArticles[1](in the first index of the array), the original title, style, content will be updated by the next values
+        //in the updateArticle object title, style, content. in the .then runs to GET the expectedArticle with the new values for title, style & content 
+        const expectedArticle = {
+          ...testArticles[idToUpdate - 1],
+          ...updateArticle
+        }
+        return supertest(app)
+            .patch(`/api/articles/${idToUpdate}`)
+            .send(updateArticle)
+            .expect(204)
+            .then(res =>
+              //running a GET to check if the ID has been updated
+              supertest(app)
+                .get(`/api/articles/${idToUpdate}`)
+                .expect(expectedArticle)
+            )
+        })
+        it('responds with 400 when no required fields are supplied', () => {
+          const idToUpdate = 2
+          return supertest(app)
+            .patch(`/api/articles/${idToUpdate}`)
+            .send({irrelevantField: 'foo'})
+            .expect( 400 , {
+              error: {
+                message: `Request body must contain either 'title', 'style' or 'content'`
+              }
+            })
+        })
+        it.only(`responds with 204 when updating only a subset of fields`, () => {
+            const idToUpdate = 2
+            const updateArticle = {
+              title: 'updated article title',
+            }
+            const expectedArticle = {
+              ...testArticles[idToUpdate - 1],
+              ...updateArticle
+            }
+      
+            return supertest(app)
+              .patch(`/api/articles/${idToUpdate}`)
+              .send({
+                ...updateArticle,
+                fieldToIgnore: 'should not be in GET response'
+              })
+              .expect(204)
+              .then(res =>
+                supertest(app)
+                  .get(`/api/articles/${idToUpdate}`)
+                  .expect({
+                    ...expectedArticle, 
+                    date_published: moment(expectedArticle.date_published).subtract(4, "hours").format("YYYY-MM-DD HH:mm Z")
+                  })
+              )
+        })
+        
     })
   })
 })
