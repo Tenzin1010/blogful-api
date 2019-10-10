@@ -17,7 +17,7 @@ const jsonParser = express.json()
     style: article.style,
     title: xss(article.title),
     content: xss(article.content),
-    date_published: new Date(article.date_published),
+    // date_published: new Date(article.date_published),
     author: article.author,
   })
   
