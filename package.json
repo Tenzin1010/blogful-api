@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "migrate": "postgrator --config postgrator-config.js",
+    "migrate:test": "env NODE_ENV=test && env TEST_DB_URL='postgresql://dunder_mifflin@localhost/blogful-test' && npm run migrate",
     "deploy": "git push heroku master",
     "predeploy": "npm audit && npm run migrate:production"
   },

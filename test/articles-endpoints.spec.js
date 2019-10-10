@@ -7,13 +7,13 @@ describe('Articles Endpoints', function() {
   let db
 
   before('make knex instance', () => {
-
+    console.log(process.env.TEST_DB_URL)
+    
     db = knex({
       client: 'pg',
-      connection: process.env.TEST_DATABASE_URL,
+      connection: process.env.TEST_DB_URL,
     })
     app.set('db', db)
-
   })
 
   after('disconnect from db', () => db.destroy())
@@ -22,7 +22,9 @@ describe('Articles Endpoints', function() {
 
   afterEach('cleanup',() => db.raw('TRUNCATE blogful_articles, blogful_users, blogful_comments RESTART IDENTITY CASCADE'))
 
+
   describe(`GET /api/articles`, () => {
+//>>>>>PASS>>>>>
     context(`Given no articles`, () => {
       it(`responds with 200 and an empty list`, () => {
         return supertest(app)
@@ -32,22 +34,22 @@ describe('Articles Endpoints', function() {
     })
 
     context('Given there are articles in the database', () => {
-      const testUsers = makeUsersArray();
-      const testArticles = makeArticlesArray();
+      const testUsers = makeUsersArray(); //users.fixtures.js
+      const testArticles = makeArticlesArray(); //articles.fixtures.js
 
       beforeEach('insert articles', () => {
         return db
           .into('blogful_users')
-          .insert(testUsers)
+          .insert(testUsers)    //users.fixtures.js
           .then(() => {
             return db
               .into('blogful_articles')
-              .insert(testArticles)
+              .insert(testArticles)  //articles.fixtures.js
           })
       })
 
       it('responds with 200 and all of the articles', () => {
-        return supertest(app)
+        return supertest(app) //connects with app.js then with articles-router.js is where the test will be compared to the results from the beforeEach() from above. 
           .get('/api/articles')
           .expect(200, testArticles)
       })
@@ -81,6 +83,7 @@ describe('Articles Endpoints', function() {
   })
 
   describe(`GET /api/articles/:article_id`, () => {
+//>>>>PASS>>>>>>    
     context(`Given no articles`, () => {
       it(`responds with 404`, () => {
         const articleId = 123456
@@ -105,7 +108,7 @@ describe('Articles Endpoints', function() {
           })
       })
 
-      it('responds with 200 and the specified article', () => {
+      it.only('responds with 200 and the specified article', () => {
         const articleId = 2
         const expectedArticle = testArticles[articleId - 1]
         return supertest(app)
@@ -140,7 +143,7 @@ describe('Articles Endpoints', function() {
     //   })
     // })
   })
-
+//>>>>>PASS>>>>
   describe(`POST /api/articles`, () => {
     const testUsers = makeUsersArray();
     beforeEach('insert malicious article', () => {
@@ -211,6 +214,7 @@ describe('Articles Endpoints', function() {
   })
 
   describe(`DELETE /api/articles/:article_id`, () => {
+  //>>>>>PASS>>>>>>>>>
     context(`Given no articles`, () => {
       it(`responds with 404`, () => {
         const articleId = 123456
@@ -251,6 +255,7 @@ describe('Articles Endpoints', function() {
   })
 
   describe(`PATCH /api/articles/:article_id`, () => {
+//>>>>>PASS>>>>>>>>    
     context(`Given no articles`, () => {
       it(`responds with 404`, () => {
         const articleId = 123456
